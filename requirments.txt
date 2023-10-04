@@ -1,0 +1,4 @@
+langchain==0.0.184
+transformers==4.30.2  # Required by HuggingFaceInstructEmbeddings
+openai==0.27.8
+tiktoken==0.4.0
