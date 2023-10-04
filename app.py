@@ -4,7 +4,6 @@ import ssl
 from email.message import EmailMessage
 import imaplib
 import email
-from dotenv import load_dotenv, find_dotenv
 from langchain.llms import OpenAI
 from langchain import PromptTemplate
 from langchain.chains import LLMChain
