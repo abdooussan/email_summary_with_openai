@@ -4,28 +4,30 @@ import ssl
 from email.message import EmailMessage
 import imaplib
 import email
+from dotenv import load_dotenv, find_dotenv
 from langchain.llms import OpenAI
 from langchain import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.chains import SequentialChain
 from langchain.chat_models import ChatOpenAI
 from langchain import PromptTemplate,  LLMChain
 import os
+import requests
+import json
 
 # To access the .env file and extract the password from it
 def main():
     st.title("User Information Form")
-    
-    # Input fields for email, key, and OpenAI API key
+    slack_api_url = "https://slack.com/api/chat.postMessage"
     username = st.text_input("Enter your email:")
-    app_password = st.text_input("Enter a key:")
-    mail_reciever=st.text_input("mail reciever:")
-    openai_api = st.text_input("Enter your OpenAI API key:", type="password")  # Hide the input as a password field
-    
+    app_password = st.text_input("Enter a key:", type="password")
+    slack_token=st.text_input("Enter slack token:", type="password")
+    slack_destination = st.text_input("Channel or user name:")
+    openai_api = st.text_input("Enter your OpenAI API key: ", type="password")  # Hide the input as a password field
     # Submit button
     if st.button("Submit"):
-        print('submit')
         # https://www.systoolsgroup.com/imap/
-        gmail_host= 'imap.gmail.com'
+        gmail_host= 'smtp.gmail.com'
         #set connection
         mail = imaplib.IMAP4_SSL(gmail_host)
         print('pass')
@@ -33,13 +35,11 @@ def main():
         mail.login(username, app_password)
         # we select the inbox mailbox
         mail.select("INBOX")
-        def get_mail_reciever():
-             return mail_reciever
         llm = ChatOpenAI(openai_api_key=openai_api)
         def newsletters_resume(body):
                 text=body[:4097]
                 template = """
-                        Write a concise summary of the following email, without mentioning that it's a summary.
+                        Write a concise summary of the following newsletter, without mentioning that it's a summary.
                         Return your response in paragraph.
                         ```{text}```
                         paragraph:
@@ -51,13 +51,11 @@ def main():
 
                 return llm_chain.run(text)
         # Read comning emails (coming TO your email adress), and that you didn't read previously:
-        _, selected_mails = mail.search(None, '(UNSEEN)', '(TO \"'+username+'\")')
+        #_, selected_mails = mail.search(None, '(UNSEEN)', '(TO \"'+username+'\")')
+        _, selected_mails = mail.search(None,None,  '(TO "' + username + '")', 'SUBJECT "newsletter*"')
 
-
-        number = 0
         for num in selected_mails[0].split():
-                if number > 0:
-                        break
+                
                 # data at this point is byte data, we have to work on it to get the actual content we want
                 _, data = mail.fetch(num , '(RFC822)')
                 _, bytes_data = data[0]
@@ -68,7 +66,7 @@ def main():
                 Subject = email_message["subject"]
                 To = email_message["to"]
                 From = email_message["from"]
-                print('--------------------------------')
+                
                 # all of these data are strings !!
                 # but the message, is represented by a tree object
                 # the walk message will take you to each part of it
@@ -81,35 +79,36 @@ def main():
 
                         # Now I have all I need. I will transform the message
                         email_sender = username
-                        email_receiver = get_mail_reciever()
                         email_subject = Subject
                         email_body = newsletters_resume(body)
 
                         # construct our email
                         em = EmailMessage()
-                        em['From'] = email_sender
-                        em['To'] = email_receiver
+                        em['From'] = From
+                        em['To'] = email_sender
                         em['Subject'] = str(email_subject).replace("\n", "").replace("\r", "")
                         em.set_content(email_body)
+                        payload = {
+                        "channel": slack_destination,
+                        "text": em.as_string()
+                        }
+                        # Headers with the Authorization token
+                        headers = {
+                        "Authorization": f"Bearer {slack_token}",
+                        "Content-Type": "application/json"
+                        }
 
-                        # specify port
-                        port = 465 # port of ssl for gmail
+                        # Send the message using the Slack API
+                        response = requests.post(slack_api_url, headers=headers, data=json.dumps(payload))
 
-                        # create a safe context for our email using Secure Sockets Layer
-                        context = ssl.create_default_context()
-
-
-                        server = smtplib.SMTP_SSL('smtp.gmail.com', port, context=context)
-                        server.login(email_sender, app_password)
-                        server.sendmail(email_sender, email_receiver, em.as_string())
-                number += 1
-
-
-
-
-
-
-
+                        # Check the response
+                        if response.status_code == 200:
+                           st.text(f"Message from {From} sent to slack channel successfully!")
+                          
+                        else:
+                                st.text(f"Failed to send message. Status code: {response.status_code}")
+                                st.text(f"Response: {response.text}")
+                st.text("Finish")
       
 
 if __name__ == '__main__':
