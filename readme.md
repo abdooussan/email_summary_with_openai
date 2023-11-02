@@ -56,12 +56,7 @@ Once set up, simply input or link your emails to the application. Within moments
 ## Contribution
 Feedback, bug reports, and pull requests are welcome. Feel free to fork and contribute to this project.
 
-## License
-This project is open source. For more details, please refer to the [LICENSE](LICENSE) file.
 
-
-    cd [repository_name]
-    ```
 
 2. Follow the installation instructions provided in the `INSTALL.md` or similar documentation within the repository.
 
